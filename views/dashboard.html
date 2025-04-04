@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Tableau de bord</title>
+</head>
+<body>
+  <h1>Tableau de bord</h1>
+
+  <button id="logoutBtn">Se déconnecter</button>
+  <h2>Mes Tâches</h2>
+  
+  <!-- Bouton pour afficher le formulaire d'ajout de tâche -->
+  <button id="createTaskBtn">Ajouter une tâche</button>
+
+  <!-- Formulaire d'ajout de tâche (initialement caché) -->
+  <div id="taskForm" style="display:none;">
+    <h3>Ajouter une tâche</h3>
+    <form id="addTaskForm">
+      <label for="title">Titre:</label>
+      <input type="text" id="title" required><br><br>
+
+      <label for="description">Description:</label>
+      <textarea id="description"></textarea><br><br>
+
+      <button type="submit">Ajouter</button>
+    </form>
+  </div>
+
+  <ul id="taskList"></ul>
+
+  <script>
+    document.getElementById('logoutBtn').addEventListener('click', () => {
+      localStorage.removeItem('token'); // Supprimer le token lors de la déconnexion
+      window.location.href = '/login'; // Rediriger vers la page de connexion
+    });
+
+    // Fonction pour afficher le formulaire d'ajout de tâche
+    document.getElementById('createTaskBtn').addEventListener('click', () => {
+      document.getElementById('taskForm').style.display = 'block'; // Afficher le formulaire
+    });
+
+    // Fonction pour récupérer et afficher les tâches
+    const getTasks = async () => {
+      const token = localStorage.getItem('token');
+      if (!token) {
+        window.location.href = '/login'; // Si pas de token, rediriger vers la page de connexion
+        return;
+      }
+
+      const response = await fetch('/api/tasks', {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+
+      const tasks = await response.json();
+      const taskList = document.getElementById('taskList');
+      taskList.innerHTML = '';
+      tasks.forEach(task => {
+        const li = document.createElement('li');
+        li.innerHTML = `
+          <strong>${task.title}</strong> - ${task.status}
+          <button onclick="markAsComplete('${task._id}')">Terminer</button>
+          <button onclick="deleteTask('${task._id}')">Supprimer</button>
+        `;
+        taskList.appendChild(li);
+      });
+    };
+
+    // Fonction pour marquer une tâche comme terminée
+    const markAsComplete = async (taskId) => {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`/api/tasks/${taskId}`, {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+      getTasks(); // Rafraîchir la liste des tâches
+    };
+
+    // Fonction pour supprimer une tâche
+    const deleteTask = async (taskId) => {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`/api/tasks/${taskId}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+      getTasks(); // Rafraîchir la liste des tâches
+    };
+
+    // Fonction pour ajouter une tâche
+    document.getElementById('addTaskForm').addEventListener('submit', async (e) => {
+      e.preventDefault(); // Empêcher le rechargement de la page
+
+      const title = document.getElementById('title').value;
+      const description = document.getElementById('description').value;
+      const token = localStorage.getItem('token');
+
+      if (!title || !description) {
+        alert("Veuillez remplir tous les champs");
+        return;
+      }
+
+      // Envoi de la tâche vers le backend
+      const response = await fetch('/api/tasks', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          title,
+          description,
+          status: 'en cours', // Par défaut la tâche est en cours
+        })
+      });
+
+      const result = await response.json();
+      if (response.ok) {
+        alert('Tâche ajoutée avec succès !');
+        getTasks(); // Rafraîchir la liste des tâches
+        document.getElementById('taskForm').style.display = 'none'; // Masquer le formulaire
+      } else {
+        alert(result.message || 'Erreur lors de l\'ajout de la tâche');
+      }
+    });
+
+    // Afficher les tâches au chargement de la page
+    getTasks();
+  </script>
+</body>
+</html>
